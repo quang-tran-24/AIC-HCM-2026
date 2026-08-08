@@ -8,6 +8,7 @@ from rapidfuzz import fuzz
 import json
 import unicodedata
 from glob import glob
+from backend.rerank import rerank_candidates # New file to reranking
 
 router = APIRouter()
 
@@ -687,6 +688,7 @@ async def process_text(input: SearchInput, request: Request, mode: int):
 
             # Use best similarity score from text search (highest = most relevant)
             best_similarity_score = max(similarity_scores)
+            best_idx = max(range(len(similarity_scores)), key=lambda i: similarity_scores[i])
 
             rows.append({
                 "video_name": video_name,
@@ -694,7 +696,8 @@ async def process_text(input: SearchInput, request: Request, mode: int):
                 "keyframes": keyframes,
                 "youtube_links": youtube_links,
                 "ocr_text": ocr_texts,
-                "similarity_score": best_similarity_score  # From text vector search
+                "similarity_score": best_similarity_score,  # From text vector search
+                "keyframe_index": int(keyframes[best_idx]),   # New Field add
             })
 
         # Add transcript
@@ -750,13 +753,22 @@ async def process_text(input: SearchInput, request: Request, mode: int):
             for r in rows:
                 r["ocr_score"] = 0
 
-        # Sort rows: prioritize similarity_score from text search, then transcript_score, then ocr_score
-        rows = sorted(rows, key=lambda x: (
-            x.get("similarity_score", 0),  # Primary: text vector similarity (highest priority)
-            x.get("transcript_score", 0),  # Secondary: transcript match score
-            x.get("ocr_score", 0),         # Tertiary: OCR match score
-            len(x.get("keyframes", []))    # Last: number of keyframes
-        ), reverse=True)
+        # # Sort rows: prioritize similarity_score from text search, then transcript_score, then ocr_score
+        # rows = sorted(rows, key=lambda x: (
+        #     x.get("similarity_score", 0),  # Primary: text vector similarity (highest priority)
+        #     x.get("transcript_score", 0),  # Secondary: transcript match score
+        #     x.get("ocr_score", 0),         # Tertiary: OCR match score
+        #     len(x.get("keyframes", []))    # Last: number of keyframes
+        # ), reverse=True)
+
+        # New Sort
+        rows = rerank_candidates(
+            rows,
+            query_vector=vector,  
+            milvus_keyframe_client=request.app.state.milvus_keyframe,
+            has_transcript_query=bool(transcript_query),
+            has_ocr_query=bool(ocr_query),
+        )
 
 
         # # Fill each row
