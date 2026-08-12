@@ -255,7 +255,77 @@ export const API = {
       console.error('Error:', error.response ? error.response.data : error.message);
       return;
     }
-  }
+  },
+
+  // Query dạng 2 (Q&A): context + question là 2 trường tách biệt (frontend đã có tab
+  // Q&A riêng nên người dùng tự nhập đúng 2 phần, không cần đoán từ 1 khối text gộp).
+  // Ảnh dùng lại đúng keyframe_path do backend trả về (đã tồn tại sẵn dưới src/assets/,
+  // không tự ghép từ frame_id để tránh sai định dạng/zero-padding tên file).
+  qaSearch: async (context, question, numContextFrames = 1) => {
+    try {
+      const ctx = (context ?? '').toString().trim();
+      const q = (question ?? '').toString().trim();
+      if (!ctx || !q) return;
+      const res = await axios.post(`http://${IPStore.getIP()}/qa-search/`, {
+        context: ctx,
+        question: q,
+        num_context_frames: numContextFrames,
+      })
+      if (res.data.error) {
+        alert('Lỗi Q&A: ' + res.data.error)
+        return
+      }
+      videos.value = [{
+        title: res.data.video_name,
+        frames: [{
+          image: `src/assets/${res.data.keyframe_path}`,
+          keyframe_path: res.data.keyframe_path,
+          number: res.data.frame_id,
+          youtube: null,
+        }],
+        text: `Câu hỏi: ${res.data.question_vi}\nTrả lời: ${res.data.answer}`,
+      }]
+      similarFrames.value = []
+      return res.data
+    } catch (error) {
+      alert('Lỗi khi gửi yêu cầu Q&A: ' + error.message)
+      console.error(error)
+    }
+  },
+
+  // Query dạng 3 (TRAKE): 1 khối text (context + "E1: ..." .. "En: ...") -> video + N
+  // frame theo đúng thứ tự sự kiện. Ảnh TRAKE được sinh động (dense re-sample) nên KHÔNG
+  // dùng quy ước "src/assets/..." (chỉ áp dụng cho keyframe tĩnh đã copy sẵn) -- load
+  // trực tiếp từ route static /dense-frames/ mới thêm ở backend.
+  trakeSearch: async (queryText) => {
+    try {
+      const q = (queryText ?? '').toString().trim();
+      if (!q) return;
+      const res = await axios.post(`http://${IPStore.getIP()}/trake-search/`, {
+        query_text: q,
+      })
+      if (res.data.error) {
+        alert('Lỗi TRAKE: ' + res.data.error)
+        return
+      }
+      videos.value = [{
+        title: res.data.video_name,
+        frames: res.data.frame_ids.map((fid, idx) => ({
+          image: `http://${IPStore.getIP()}/dense-frames/${res.data.video_name}/${fid}.jpg`,
+          keyframe_path: res.data.frame_paths[idx],
+          number: fid,
+          youtube: null,
+          eventLabel: `E${idx + 1}`,
+        })),
+        text: `${res.data.num_events} sự kiện · điểm định vị thô: ${Number(res.data.coarse_score).toFixed(3)}`,
+      }]
+      similarFrames.value = []
+      return res.data
+    } catch (error) {
+      alert('Lỗi khi gửi yêu cầu TRAKE: ' + error.message)
+      console.error(error)
+    }
+  },
 
 }
 // async function testApi(text) {

@@ -184,7 +184,9 @@ export const videos = ref([
           >
             {{ frame.number }}
           </a>
-
+          <span v-else class="frame-number">
+            {{ frame.eventLabel ? `${frame.eventLabel} · ${frame.number}` : frame.number }}
+          </span>
 
         </div>
       </div>
@@ -265,4 +267,3 @@ export const videos = ref([
       border-radius: 8px;
   }
 </style>
-

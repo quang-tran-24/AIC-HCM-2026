@@ -20,6 +20,46 @@ const nextSceneTranslated = ref('')
 const transcription = ref('')
 const ocr = ref('')
 
+// Query dạng 1/2/3 (KIS / Q&A / TRAKE) tách riêng chế độ tìm kiếm: Q&A gọi Qwen2.5-VL
+// (chậm, tốn VRAM) nên tách khỏi luồng KIS/TRAKE thường dùng, tránh gây nhầm lẫn UI --
+// việc Q&A có thực sự không làm chậm KIS/TRAKE hay không phụ thuộc vào backend chạy
+// asyncio.to_thread (đã sửa), tách UI ở đây chủ yếu để rõ ràng luồng thao tác.
+const searchMode = ref('kis') // 'kis' | 'qa' | 'trake'
+const qaContext = ref('')
+const qaQuestion = ref('')
+const qaNumContextFrames = ref(1)
+const qaLoading = ref(false)
+const trakeQueryText = ref('')
+const trakeLoading = ref(false)
+
+async function runQASearch() {
+  if (!qaContext.value.trim() || !qaQuestion.value.trim()) {
+    alert('Nhập cả mô tả sự kiện (context) và câu hỏi trước đã')
+    return
+  }
+  qaLoading.value = true
+  try {
+    await API.qaSearch(qaContext.value, qaQuestion.value, qaNumContextFrames.value)
+    resetScrollPositions()
+  } finally {
+    qaLoading.value = false
+  }
+}
+
+async function runTrakeSearch() {
+  if (!trakeQueryText.value.trim()) {
+    alert('Nhập nội dung truy vấn TRAKE trước đã')
+    return
+  }
+  trakeLoading.value = true
+  try {
+    await API.trakeSearch(trakeQueryText.value)
+    resetScrollPositions()
+  } finally {
+    trakeLoading.value = false
+  }
+}
+
 const QuestionID = ref(1)
 const frameStore = useSelectedFramesStore()
 const showNumberInputs = ref(false);
@@ -295,6 +335,48 @@ function confirmNumberInputs() {
 </script>
 <template>
     <div class="sidebar">
+      <div class="mode-switcher">
+        <button :class="['mode-tab', { active: searchMode === 'kis' }]" @click="searchMode = 'kis'">Query 1 · KIS</button>
+        <button :class="['mode-tab', { active: searchMode === 'qa' }]" @click="searchMode = 'qa'">Query 2 · Q&amp;A</button>
+        <button :class="['mode-tab', { active: searchMode === 'trake' }]" @click="searchMode = 'trake'">Query 3 · TRAKE</button>
+      </div>
+
+      <div v-if="searchMode === 'qa'" class="input-section">
+        <h3>Query 2 — Q&amp;A</h3>
+        <label class="qa-field-label">Mô tả sự kiện (context)</label>
+        <textarea
+          v-model="qaContext"
+          class="input-field"
+          placeholder="Mô tả sự kiện trong video..."
+        ></textarea>
+        <label class="qa-field-label">Câu hỏi</label>
+        <textarea
+          v-model="qaQuestion"
+          class="input-field qa-question-field"
+          placeholder="Câu hỏi cần trả lời..."
+        ></textarea>
+        <div class="qa-context-row">
+          <label for="qa-context-frames">Số frame ngữ cảnh</label>
+          <input id="qa-context-frames" type="number" min="1" max="5" v-model.number="qaNumContextFrames" style="width: 70px;" />
+        </div>
+        <button class="search-button" @click="runQASearch" :disabled="qaLoading">
+          {{ qaLoading ? 'Đang hỏi Qwen...' : 'Tìm câu trả lời' }}
+        </button>
+      </div>
+
+      <div v-else-if="searchMode === 'trake'" class="input-section">
+        <h3>Query 3 — TRAKE</h3>
+        <textarea
+          v-model="trakeQueryText"
+          class="input-field"
+          placeholder="Dán nguyên văn truy vấn TRAKE (context + &quot;E1: ...&quot; .. &quot;En: ...&quot;)..."
+        ></textarea>
+        <button class="search-button" @click="runTrakeSearch" :disabled="trakeLoading">
+          {{ trakeLoading ? 'Đang định vị chuỗi sự kiện...' : 'Tìm chuỗi sự kiện' }}
+        </button>
+      </div>
+
+      <div v-show="searchMode === 'kis'">
       <div class="input-section">
         <h3>Base query</h3>
   <textarea v-model="text" class="input-field" placeholder="Enter content..." @keydown.enter.prevent="Search"></textarea>
@@ -328,6 +410,7 @@ function confirmNumberInputs() {
 
       <button class="search-button" @click=Search>Search</button>
       <button class="search-button" style="margin-left:10px" @click=MultiSearch>MultiSearch</button>
+      </div>
 
       <div class="rowww">
         <div class="question-id">
@@ -406,6 +489,51 @@ function confirmNumberInputs() {
 
 
 <style scoped>
+    .mode-switcher {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 16px;
+    }
+    .mode-tab {
+        flex: 1;
+        padding: 8px 4px;
+        background-color: #2a2a2a;
+        color: #aaa;
+        border: 1px solid #444;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+    }
+    .mode-tab.active {
+        background-color: #19d19a;
+        color: #000;
+        font-weight: bold;
+        border-color: #19d19a;
+    }
+    .qa-field-label {
+        display: block;
+        color: #999;
+        font-size: 12px;
+        margin: 10px 0 4px 0;
+    }
+    .qa-question-field {
+        min-height: 60px;
+    }
+    .qa-context-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 8px 0;
+        color: #ccc;
+        font-size: 13px;
+    }
+    .qa-context-row input {
+        background-color: #333;
+        border: 1px solid #444;
+        border-radius: 4px;
+        color: #fff;
+        padding: 4px;
+    }
     .sidebar {
         width: 25%;
         background-color: #222;

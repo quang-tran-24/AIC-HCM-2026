@@ -7,8 +7,13 @@ import easyocr
 from collections import defaultdict
 
 # ============ Cấu hình ============
-INPUT_DIR = "keyframes"          # cấu trúc: keyframes/<video_name>/<frame>.jpg
-OUTPUT_DIR = "ocr-json"          # mỗi video ra 1 file json: ocr-json/<video_name>.json
+INPUT_DIR = os.path.join("datasets", "keyframes")   # cấu trúc: datasets/keyframes/<video_name>/<frame>.jpg
+OUTPUT_DIR = os.path.join("datasets", "ocr-json")    # mỗi video ra 1 file json: datasets/ocr-json/<video_name>.json
+# LUU Y: 2 duong dan tren PHAI dung "datasets/..." de khop voi OCR_DIR trong
+# backend/api/quick_search.py va OCR_JSON_DIR trong backend/load_milvus_vector_database.py --
+# ban goc cua 2 dong nay (repo goc + file ban upload) thieu tien to "datasets/", khien
+# glob() tim duoc 0 file (neu chay tu repo root) va/hoac ghi output sai cho, backend
+# khong bao gio doc duoc.
 BATCH_SIZE = 16                  # chỉnh theo VRAM/CPU
 DETAIL = 1                       # 1: lấy bbox, text, confidence
 LANGS = ['en', 'vi']             # ngôn ngữ OCR

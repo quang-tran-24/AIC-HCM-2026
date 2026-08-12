@@ -55,6 +55,14 @@ for video_path in video_paths:
     single_frame_predictions_np = single_frame_predictions.cpu().numpy() if hasattr(single_frame_predictions, "cpu") else single_frame_predictions
     frame_ranges = transnetv2_model.predictions_to_scenes(single_frame_predictions_np)
 
+    # MỚI: lưu scene boundary cho TRAKE (backend/load_scene_vector_database.py cần)
+    scene_txt_dir = os.path.join("datasets", "transnetv2-scenes")
+    os.makedirs(scene_txt_dir, exist_ok=True)
+    video_name_for_scenes = os.path.splitext(os.path.basename(video_path))[0]
+    with open(os.path.join(scene_txt_dir, f"{video_name_for_scenes}.mp4.scenes.txt"), "w") as sf:
+        for frame_range in frame_ranges:
+            sf.write(f"{int(frame_range[0])} {int(frame_range[1])}\n")
+
     list_of_extracted_frame_index = []
     for frame_range in frame_ranges:
         start, end = frame_range[0], frame_range[1]

@@ -32,7 +32,7 @@ python backend/load_scene_vector_database.py
 
 2. Start the backend server with FastAPI: 
 ```
-uvicorn backend.main:app --reload
+  uvicorn backend.main:app --reload
 ```
 You may be waiting for 10 seconds to load the two models: openai/clip-vit-large-patch14 and Google Translator.
 
