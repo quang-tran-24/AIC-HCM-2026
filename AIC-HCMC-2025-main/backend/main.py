@@ -14,9 +14,10 @@ from backend.qa_answer import QwenVLAnswerer
 os.makedirs("submission", exist_ok=True)
 
 app = FastAPI()
-    # Add news
-   os.makedirs(os.path.join("datasets", "keyframes_dense"), exist_ok=True)
-   app.mount("/dense-frames", StaticFiles(directory=os.path.join("datasets", "keyframes_dense")), name="dense_frames")
+
+# Add news
+os.makedirs(os.path.join("datasets", "keyframes_dense"), exist_ok=True)
+app.mount("/dense-frames", StaticFiles(directory=os.path.join("datasets", "keyframes_dense")), name="dense_frames")
 
 # CORS middleware
 app.add_middleware(
